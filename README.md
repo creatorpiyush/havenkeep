@@ -8,10 +8,22 @@ Havenkeep is a multi-agent orchestration framework designed for safe, cost-bound
 
 ## 📚 Documentation Index
 
+- [🧠 **Concept & Core Philosophy**](file:///Users/piyush.anand/self_code/havenkeep/docs/CONCEPT.md) — What is an AI harness? Layman explanation of Havenkeep's goals and architecture.
 - [🛠️ **Setup & Installation Guide**](file:///Users/piyush.anand/self_code/havenkeep/docs/SETUP.md) — Detailed environment setup, Docker/Podman compose, local dev, and testing instructions.
 - [📐 **Technical Architecture Specification**](file:///Users/piyush.anand/self_code/havenkeep/ARCHITECTURE.md) — System design, risk scoring math, LangGraph state machine, policy engine, and SSE protocols.
 - [📋 **Phased Implementation Plan**](file:///Users/piyush.anand/self_code/havenkeep/multi_agent_harness_implementation_plan.md) — Multi-phase build roadmap and governance invariants.
 - [📜 **Changelog & Version History**](file:///Users/piyush.anand/self_code/havenkeep/CHANGELOG.md) — Detailed release logs and version notes (Current version: `v0.1.0`).
+
+---
+
+## 💡 What is Havenkeep in Plain English?
+
+> **Think of Havenkeep as an AI Security Guard, Traffic Controller, and Budget Enforcer.**
+> 
+> Raw AI models (like GPT-4o or Claude) are like powerful sports car engines. A **harness** is the vehicle framework built around the engine—providing **steering, brakes, seatbelts, fuel gauges, and black-box flight recorders**.
+> 
+> Havenkeep gives AI agents real power to complete work, while guaranteeing they can **never overspend your budget, bypass safety policies, or modify critical production systems without your explicit permission.**
+
 
 
 ---
