@@ -1,0 +1,19 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "havenkeep-backend"
+version = "0.1.0"
+description = "Havenkeep Multi-Agent Orchestration & Governance Backend"
+authors = [{ name = "Havenkeep Engineering Team" }]
+requires-python = ">=3.11"
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["../tests", "tests"]
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+ignore_missing_imports = true
