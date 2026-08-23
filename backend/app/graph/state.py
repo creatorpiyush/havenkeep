@@ -1,4 +1,5 @@
-from typing import TypedDict, List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional
+from typing_extensions import TypedDict
 from langchain_core.messages import BaseMessage
 
 class HavenkeepState(TypedDict):

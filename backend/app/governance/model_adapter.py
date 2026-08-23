@@ -27,6 +27,23 @@ class ModelProviderAdapter:
     }
 
     @staticmethod
+    def get_model_name(role: str) -> str:
+        """
+        Resolves and returns the active model string for a given agent role.
+        Prefers role-specific .env model overrides if set, otherwise falls back to provider defaults.
+        """
+        role_map = {
+            "supervisor": (settings.supervisor_provider, settings.supervisor_model),
+            "planner": (settings.planner_provider, settings.planner_model),
+            "worker": (settings.worker_provider, settings.worker_model),
+            "critic": (settings.critic_provider, settings.critic_model),
+            "executor": (settings.executor_provider, settings.executor_model),
+        }
+        provider, configured_model = role_map.get(role.lower(), (settings.worker_provider, settings.worker_model))
+        provider_lower = provider.lower()
+        return configured_model or ModelProviderAdapter.DEFAULT_PROVIDER_MODELS.get(provider_lower, "gpt-4o-mini")
+
+    @staticmethod
     def get_model(
         role: str, 
         temperature: float = 0.0,
@@ -43,6 +60,7 @@ class ModelProviderAdapter:
             "planner": (settings.planner_provider, settings.planner_model),
             "worker": (settings.worker_provider, settings.worker_model),
             "critic": (settings.critic_provider, settings.critic_model),
+            "executor": (settings.executor_provider, settings.executor_model),
         }
         
         provider, configured_model = role_map.get(role.lower(), (settings.worker_provider, settings.worker_model))
@@ -166,7 +184,13 @@ class ModelProviderAdapter:
         if role_lower == "supervisor":
             res = '{"task_type": "GENERAL_QA", "risk_score": 0.2, "lane": "fast_lane", "confidence": 0.95}'
         elif role_lower in ("critic", "guardrail"):
-            res = '{"passed": true, "feedback": "Response passed quality guardrails.", "adjusted_output": null}'
+            res = '{"passed": true, "verdict": "PASS", "feedback": "Response passed quality guardrails.", "adjusted_output": null}'
+        elif role_lower == "planner":
+            res = '[{"step_id": 1, "description": "Inspect and prepare operation", "tool_name": "internal_compute", "tool_args": {}}, {"step_id": 2, "description": "Execute governed operation", "tool_name": "database_write", "tool_args": {"query": "DELETE"}}]'
+        elif role_lower == "executor":
+            res = "Governed plan execution completed safely under policy allowlist supervision."
+        elif role_lower == "worker":
+            res = "Task processed successfully under Fast-Lane worker execution."
         else:
             res = "Synchronous execution blocks the current thread until completion, while asynchronous execution yields execution during I/O operations."
         return FakeListChatModel(responses=[res])

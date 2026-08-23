@@ -25,6 +25,7 @@ Use this skill when developing, testing, refactoring, or extending the **Havenke
 - **Individual Test Modules:**
   - Supervisor benchmark (30 routing test cases): `TESTING=1 PYTHONPATH=backend pytest tests/test_supervisor.py -v`
   - Fast-Lane end-to-end execution & policy checks: `TESTING=1 PYTHONPATH=backend pytest tests/test_fast_lane.py -v`
+  - Governed-Lane (Planner/Executor/Critic) execution: `TESTING=1 PYTHONPATH=backend pytest tests/test_governed_lane.py -v`
   - Policy Engine & 3-Tier enforcement: `TESTING=1 PYTHONPATH=backend pytest tests/test_policy_engine.py -v`
   - Cost tracker & budget cap checks: `TESTING=1 PYTHONPATH=backend pytest tests/test_cost_tracker.py -v`
 

@@ -63,7 +63,8 @@ class FastLaneWorkerNode:
         completion_tokens = usage.get("output_tokens", 150)
 
         # Token & Cost Tracking
-        call_cost = CostTracker.calculate_cost("gpt-4o-mini", prompt_tokens, completion_tokens)
+        model_name = ModelProviderAdapter.get_model_name("worker")
+        call_cost = CostTracker.calculate_cost(model_name, prompt_tokens, completion_tokens)
         current_cost = state.get("cumulative_cost_usd", 0.0)
         new_cost, is_soft_warn, is_hard_halt = CostTracker.update_and_check_budget(
             current_cost, call_cost, state.get("soft_budget_usd", 0.50), state.get("hard_budget_usd", 2.00)

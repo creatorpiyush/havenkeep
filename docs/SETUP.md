@@ -60,6 +60,9 @@ Havenkeep supports a **Multi-Supplier Architecture** (Anthropic, OpenAI, Ollama,
 
    CRITIC_PROVIDER=ollama
    CRITIC_MODEL=gemma3:latest
+
+   EXECUTOR_PROVIDER=openai
+   EXECUTOR_MODEL=gpt-4o-mini
    ```
 
 ---
@@ -125,14 +128,14 @@ Docker/Podman Compose spins up PostgreSQL (with `pgvector`), Redis, FastAPI back
 ## 5. Testing & Verification
 
 ### 5.1 Interactive CLI Harness (Free Local Test)
-Run the interactive CLI test harness to manually execute tasks through the full LangGraph state machine (Supervisor $\rightarrow$ Fast-Lane Worker $\rightarrow$ Guardrail Pass $\rightarrow$ Audit Log):
+Run the interactive CLI test harness to manually execute tasks through the full LangGraph state machine (Supervisor $\rightarrow$ Fast-Lane Worker / Governed-Lane Planner/Executor/Critic $\rightarrow$ Audit Log):
 
 ```bash
 PYTHONPATH=backend ./venv/bin/python3 scripts/interactive_test.py
 ```
 
 ### 5.2 Automated Pytest Benchmark Suite
-Execute all 12 automated unit and integration tests (30 supervisor routing benchmark tasks, Fast-Lane execution, guardrail checks, 3-tier policy allowlists, budget caps):
+Execute all 16 automated unit and integration tests (30 supervisor routing benchmark tasks, Fast-Lane execution, Governed-Lane Planner/Executor/Critic execution, guardrail checks, 3-tier policy allowlists, budget caps):
 
 ```bash
 TESTING=1 PYTHONPATH=backend ./venv/bin/python3 -m pytest tests/ -v

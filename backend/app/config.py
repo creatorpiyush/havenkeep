@@ -47,6 +47,9 @@ class Settings(BaseSettings):
     critic_provider: str = Field(default="ollama", alias="CRITIC_PROVIDER")
     critic_model: Optional[str] = Field(default=None, alias="CRITIC_MODEL")
 
+    executor_provider: str = Field(default="openai", alias="EXECUTOR_PROVIDER")
+    executor_model: Optional[str] = Field(default=None, alias="EXECUTOR_MODEL")
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",

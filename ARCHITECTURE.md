@@ -83,7 +83,7 @@ class HavenkeepState(TypedDict):
     final_output: Optional[str]
 ```
 
-### 3.2 Fast-Lane Subgraph Execution Flow (Phase 2)
+### 3.2 State Machine Routing Flow (Phase 2 & Phase 3)
 
 ```
                        ┌─────────────────────────┐
@@ -100,18 +100,29 @@ class HavenkeepState(TypedDict):
                        YES                      NO
                         │                       │
            ┌────────────▼────────────┐ ┌────────▼───────────┐
-           │   FastLaneWorkerNode    │ │ GovernedLaneStub   │
+           │   FastLaneWorkerNode    │ │    PlannerNode     │
            └────────────┬────────────┘ └────────┬───────────┘
                         │                       │
-           ┌────────────▼────────────┐          │
-           │ FastLaneGuardrailNode   │          │
-           └────────────┬────────────┘          │
+           ┌────────────▼────────────┐ ┌────────▼───────────┐
+           │  FastLaneGuardrailNode  │ │    ExecutorNode    │
+           └────────────┬────────────┘ └────────┬───────────┘
                         │                       │
-                        └───────────┬───────────┘
-                                    │
-                       ┌────────────▼────────────┐
-                       │           END           │
-                       └─────────────────────────┘
+                        │              ┌────────▼───────────┐
+                        │              │     CriticNode     │
+                        │              └────────┬───────────┘
+                        │                       │
+                        │         Is MINOR_REVISION & count < 2?
+                        │            ┌──────────┴──────────┐
+                        │           YES                    NO
+                        │            │                      │
+                        │      Route back to                │
+                        │      ExecutorNode                 │
+                        │                       │           │
+                        └───────────────────────┴─────┬─────┘
+                                                      │
+                                         ┌────────────▼────────────┐
+                                         │           END           │
+                                         └─────────────────────────┘
 ```
 
 1. **FastLaneWorkerNode ([worker.py](backend/app/graph/nodes/worker.py)):**
@@ -125,9 +136,21 @@ class HavenkeepState(TypedDict):
    - Updates `HavenkeepState` with `final_output` and verdict (`PASS` / `REVISED`).
    - Logs `GUARDRAIL_PASSED` / `GUARDRAIL_REVISED` to `AuditLogger`.
 
+3. **PlannerNode ([planner.py](backend/app/graph/nodes/planner.py)):**
+   - Decomposes high-risk tasks into a sequential execution plan (JSON steps).
+   - Emits `PLAN_GENERATED` event to `AuditLogger` and tracks token spend.
+
+4. **ExecutorNode ([executor.py](backend/app/graph/nodes/executor.py)):**
+   - Executes plan steps, checking every tool action against `PolicyEngine`.
+   - If a Tier 1 or unapproved tool action is proposed, flags `approval_required: true`.
+
+5. **CriticNode ([critic.py](backend/app/graph/nodes/critic.py)):**
+   - Evaluates execution output against rubric.
+   - Returns structured verdict (`PASS`, `MINOR_REVISION`, `MAJOR_REVISION`, `ESCALATE`) and enforces a 2-cycle iteration cap.
+
 ---
 
-## 4. Shared Governance Primitives
+## 4. Shared Governance Primitives & Dynamic Model Cost Pricing
 
 ```
                     ┌─────────────────────────┐
@@ -135,11 +158,11 @@ class HavenkeepState(TypedDict):
                     └────────────┬────────────┘
                                  │
                     ┌────────────▼────────────┐
-                    │  ModelProviderAdapter   │ (Translates raw LLM outputs across vendors)
+                    │  ModelProviderAdapter   │ (Translates raw LLM outputs & resolves active model names)
                     └────────────┬────────────┘
                                  │
                     ┌────────────▼────────────┐
-                    │       CostTracker       │ (Inspects tokens, calculates USD, checks soft/hard caps)
+                    │       CostTracker       │ (Calculates USD using dynamic ModelProviderAdapter.get_model_name)
                     └────────────┬────────────┘
                                  │
                     ┌────────────▼────────────┐
@@ -151,75 +174,13 @@ class HavenkeepState(TypedDict):
                     └─────────────────────────┘
 ```
 
-### 4.1 PolicyEngine & 3-Tier Tool Matrix
+### 4.1 Dynamic Model Cost Pricing Lookup
+Instead of hardcoding pricing strings inside individual agent nodes, `ModelProviderAdapter.get_model_name(role)` dynamically resolves the configured model string from `.env` overrides (`SUPERVISOR_MODEL`, `PLANNER_MODEL`, `WORKER_MODEL`, `CRITIC_MODEL`, `EXECUTOR_MODEL`) or provider defaults, ensuring accurate cost tracking across Anthropic, OpenAI, Ollama, Google Gemini, Groq, and OpenRouter.
+
+### 4.2 PolicyEngine & 3-Tier Tool Matrix
 
 Before executing any tool, the `PolicyEngine` evaluates the requested function and arguments against pre-defined rules:
 
 - **Tier 1 (Always Require Approval):** `external_http_post`, `send_email`, `send_message`, `database_write`, `file_delete`, `deploy_command`, `payment`, `execute_shell_command`, `modify_permissions`.
 - **Tier 2 (Opt-in Auto-Approve / Sandbox Restricted):** `file_write` (outside scratch path), `database_read` (unscoped wildcard `SELECT *`), `git_commit`/`git_push` to feature branch, `web_fetch` from external unvetted URL.
 - **Tier 3 (Never Require Approval):** `file_read`, scoped `database_read`, internal computation, `web_search`.
-
-### 4.2 Plan Drift Detection
-In the Governed-Lane, when the `ExecutorNode` attempts a tool call, `PolicyEngine` compares the tool call against the `approved_plan`. If the tool action or target resource diverges from the approved step description, the execution is flagged with `PLAN_DRIFT` and sent to the approval gate.
-
-### 4.3 CostTracker & Soft/Hard Budget Enforcer
-- **Soft Threshold (e.g., $0.50):** Emits `BUDGET_WARNING` SSE event and logs warning to audit trail.
-- **Hard Threshold (e.g., $2.00):** Halts node transition, sets `is_budget_exceeded = True`, and invokes `interrupt()` presenting a human budget-escalation prompt.
-
----
-
-## 5. LangGraph `interrupt()` & Durable State Resumption
-
-```
-   Executor / Approval Node
-             │
-   Check Action & Policy
-             │
-   Action is Tier 1 / Drift?
-       ├── NO ──► Execute Tool & Continue
-       │
-      YES
-       │
-  interrupt({ "action": tool_name, "params": args })
-       │
-  [Graph Execution Paused] ──► State saved to PostgreSQL via PostgresSaver
-       │
-  Client Receives SSE Event ("INTERRUPT_REQUIRED")
-       │
-  User Clicks Approve / Reject in Next.js UI (@ Port 3000)
-       │
-  FastAPI receives POST /api/tasks/{task_id}/approve
-       │
-  app.stream(Command(resume={"status": "APPROVED"}), config=thread_config)
-       │
-  [Graph Resumes from Node Start]
-```
-
-> [!CAUTION]
-> **Node Re-Execution Safety:** When LangGraph resumes from a `Command(resume=...)`, it restarts the node from the beginning. All `interrupt()` calls are placed at the top of the node before side effects to ensure functions are not executed twice.
-
----
-
-## 6. Real-Time Streaming Protocol (SSE)
-
-FastAPI streams graph state updates to the Next.js client using Server-Sent Events (SSE) over `/api/tasks/{task_id}/stream`:
-
-```json
-event: node_start
-data: {"node": "supervisor", "timestamp": "2026-08-23T01:15:00Z"}
-
-event: router_classified
-data: {"lane": "governed_lane", "risk_score": 0.85, "task_type": "CODE_GENERATION"}
-
-event: node_start
-data: {"node": "planner", "timestamp": "2026-08-23T01:15:02Z"}
-
-event: plan_created
-data: {"steps": [{"id": 1, "title": "Inspect repository structure"}, {"id": 2, "title": "Refactor component"}]}
-
-event: interrupt_required
-data: {"thread_id": "session-123", "action": "file_write", "path": "/app/main.py", "tier": "Tier 2"}
-
-event: node_complete
-data: {"node": "executor", "cost_usd": 0.042, "tokens": 1250}
-```

@@ -107,5 +107,5 @@ async def test_governed_lane_stub_routing():
     final_state = await havenkeep_app.ainvoke(initial_state)
 
     assert final_state["lane"] == "governed_lane"
-    assert "[GOVERNED_LANE_STUB]" in final_state["final_output"]
-    assert final_state["critic_verdict"] == "ESCALATE"
+    assert len(final_state["plan_steps"]) > 0
+    assert final_state["approval_required"] is True

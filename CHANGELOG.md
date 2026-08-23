@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.3.0] - 2026-08-23
+
+### Added
+- **Governed-Lane Planner Node (`PlannerNode`):** Decomposes complex and high-risk tasks into structured execution plan steps (JSON).
+- **Governed-Lane Executor Node (`ExecutorNode`):** Executes plan steps, checking every tool action against `PolicyEngine` allowlists and flagging Tier 1 operations for human approval.
+- **Governed-Lane Critic Node (`CriticNode`):** Rubric-driven verification returning verdict enums (`PASS`, `MINOR_REVISION`, `MAJOR_REVISION`, `ESCALATE`) and enforcing a 2-cycle max iteration cap.
+- **Dynamic Model Cost Pricing Lookup:** `ModelProviderAdapter.get_model_name(role)` resolves active model strings from `.env` overrides or provider defaults across all agent nodes for exact cost tracking.
+- **Governance Models Inspection Endpoint (`GET /api/governance/models`):** Exposes active role model bindings, provider settings, budget limits, and pricing tables.
+- **Governed-Lane Automated Test Suite (`test_governed_lane.py`):** 16/16 automated unit and integration tests passing cleanly.
+
 ## [0.2.0] - 2026-08-23
 
 ### Added

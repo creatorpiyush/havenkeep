@@ -13,7 +13,7 @@ Havenkeep is a multi-agent orchestration framework designed for safe, cost-bound
 - [🧪 **Manual & Regression Testing Guide**](docs/TESTING.md) — Step-by-step cURL scenarios, CLI harness, and automated regression test matrix.
 - [📐 **Technical Architecture Specification**](ARCHITECTURE.md) — System design, risk scoring math, LangGraph state machine, policy engine, and SSE protocols.
 - [📋 **Phased Implementation Plan**](multi_agent_harness_implementation_plan.md) — Multi-phase build roadmap and governance invariants.
-- [📜 **Changelog & Version History**](CHANGELOG.md) — Detailed release logs and version notes (Current version: `v0.2.0`).
+- [📜 **Changelog & Version History**](CHANGELOG.md) — Detailed release logs and version notes (Current version: `v0.3.0`).
 
 ---
 
@@ -60,7 +60,10 @@ Audit logging, 3-tier policy allowlist enforcement, token usage tracking, and mo
 
 ### 2. Dual-Lane Dynamic Routing & Fast-Lane Orchestration (Phase 2 Complete)
 - **Fast-Lane:** Low-stakes tasks (`RESEARCH`, `CODE_GENERATION`, `DATA_ANALYSIS`, `GENERAL_QA`) execute via specialized worker agents (`FastLaneWorkerNode`) with minimal token overhead and low latency, verified by a checklist guardrail pass (`FastLaneGuardrailNode`).
-- **Governed-Lane:** High-stakes or multi-step tasks run through a **Planner → Executor → Critic** self-correction loop with durable human-in-the-loop approval gates (Phase 3).
+
+### 3. Governed-Lane Multi-Agent Flow & Dynamic Cost Pricing (Phase 3 Complete)
+- **Governed-Lane:** High-stakes or multi-step tasks run through a **Planner → Executor → Critic** self-correction loop with durable human-in-the-loop approval gates.
+- **Dynamic Model Cost Pricing Lookup:** `ModelProviderAdapter.get_model_name(role)` resolves exact configured model strings from `.env` overrides (`SUPERVISOR_MODEL`, `PLANNER_MODEL`, `WORKER_MODEL`, `CRITIC_MODEL`, `EXECUTOR_MODEL`) or provider defaults for accurate cost tracking.
 
 ### 3. Human-in-the-Loop (`interrupt`) & Per-Plan Approval
 - Native LangGraph `interrupt()` pauses execution at critical decision points and persists graph state directly to PostgreSQL.

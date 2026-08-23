@@ -6,8 +6,11 @@ from app.db.database import get_db
 from app.graph.nodes.supervisor import SupervisorNode
 from app.governance.policy_engine import PolicyEngine
 from app.governance.audit_logger import AuditLogger
+from app.governance.model_adapter import ModelProviderAdapter
+from app.governance.cost_tracker import CostTracker
 from app.graph.state import HavenkeepState
 from app.graph.workflow import havenkeep_app
+from app.config import settings
 
 router = APIRouter(prefix="/api", tags=["Governance & Routing"])
 
@@ -184,3 +187,29 @@ async def execute_workflow(
         cumulative_cost_usd=final_state.get("cumulative_cost_usd", 0.0),
         is_budget_exceeded=final_state.get("is_budget_exceeded", False)
     )
+
+@router.get("/governance/models")
+async def get_governance_models_config():
+    """
+    Returns active model provider bindings, resolved model names per role,
+    pricing table parameters, and default budget limits.
+    """
+    roles = ["supervisor", "planner", "worker", "critic", "executor"]
+    role_bindings = {
+        role: {
+            "provider": getattr(settings, f"{role}_provider", "default"),
+            "resolved_model": ModelProviderAdapter.get_model_name(role)
+        }
+        for role in roles
+    }
+
+    return {
+        "active_roles": role_bindings,
+        "pricing_table_usd_per_1m": CostTracker.PRICING_TABLE,
+        "default_budgets": {
+            "session_soft_budget_usd": settings.session_soft_budget_usd,
+            "session_hard_budget_usd": settings.session_hard_budget_usd,
+            "task_hard_budget_usd": settings.task_hard_budget_usd
+        }
+    }
+
