@@ -78,7 +78,52 @@ class HavenkeepState(TypedDict):
     cumulative_prompt_tokens: int
     cumulative_completion_tokens: int
     cumulative_cost_usd: float
+    
+    # Final Output Response
+    final_output: Optional[str]
 ```
+
+### 3.2 Fast-Lane Subgraph Execution Flow (Phase 2)
+
+```
+                       ┌─────────────────────────┐
+                       │          START          │
+                       └────────────┬────────────┘
+                                    │
+                       ┌────────────▼────────────┐
+                       │     SupervisorNode      │
+                       └────────────┬────────────┘
+                                    │
+                         Is Risk Score <= 0.40?
+                        ┌───────────┴───────────┐
+                        │                       │
+                       YES                      NO
+                        │                       │
+           ┌────────────▼────────────┐ ┌────────▼───────────┐
+           │   FastLaneWorkerNode    │ │ GovernedLaneStub   │
+           └────────────┬────────────┘ └────────┬───────────┘
+                        │                       │
+           ┌────────────▼────────────┐          │
+           │ FastLaneGuardrailNode   │          │
+           └────────────┬────────────┘          │
+                        │                       │
+                        └───────────┬───────────┘
+                                    │
+                       ┌────────────▼────────────┐
+                       │           END           │
+                       └─────────────────────────┘
+```
+
+1. **FastLaneWorkerNode ([worker.py](backend/app/graph/nodes/worker.py)):**
+   - Applies specialized prompt strategies according to `task_type` (`RESEARCH`, `CODE_GENERATION`, `DATA_ANALYSIS`, `GENERAL_QA`).
+   - Calls `PolicyEngine.evaluate_tool_call` before initiating tool invocations.
+   - Calculates token cost via `CostTracker` and updates `cumulative_cost_usd`.
+   - Records transition event `WORKER_EXECUTED` to `AuditLogger`.
+
+2. **FastLaneGuardrailNode ([guardrail.py](backend/app/graph/nodes/guardrail.py)):**
+   - Conducts a lightweight checklist review of the generated worker output verifying safety, relevance, and coherent structure.
+   - Updates `HavenkeepState` with `final_output` and verdict (`PASS` / `REVISED`).
+   - Logs `GUARDRAIL_PASSED` / `GUARDRAIL_REVISED` to `AuditLogger`.
 
 ---
 

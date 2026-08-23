@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.2.0] - 2026-08-23
+
+### Added
+- **Fast-Lane Worker Node (`FastLaneWorkerNode`):** Specialized prompt handlers for `RESEARCH`, `CODE_GENERATION`, `DATA_ANALYSIS`, and `GENERAL_QA` integrated directly with Shift-Left governance (`PolicyEngine`, `CostTracker`, `AuditLogger`).
+- **Fast-Lane Guardrail Node (`FastLaneGuardrailNode`):** Checklist-based safety and quality pass evaluating worker outputs prior to user delivery.
+- **LangGraph State Machine Engine (`workflow.py`):** Compiled LangGraph workflow routing tasks: `START` -> `SupervisorNode` -> (`FastLaneWorkerNode` -> `FastLaneGuardrailNode` | `GovernedLaneStub`) -> `END`.
+- **FastAPI End-to-End Execution API (`/api/workflow/execute`):** REST API endpoint invoking the full LangGraph state machine with token/cost tracking and audit responses.
+- **Fast-Lane Automated Test Suite (`test_fast_lane.py`):** Integration tests covering end-to-end execution, policy allowlists, budget tracking, and governed-lane routing stubs.
+
 ## [0.1.0] - 2026-08-23
 
 ### Added

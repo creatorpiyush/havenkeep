@@ -125,27 +125,34 @@ Docker/Podman Compose spins up PostgreSQL (with `pgvector`), Redis, FastAPI back
 ## 5. Testing & Verification
 
 ### 5.1 Interactive CLI Harness (Free Local Test)
-Run the interactive CLI test harness to manually test Supervisor risk classification, policy checks, audit logging, and budget enforcement:
+Run the interactive CLI test harness to manually execute tasks through the full LangGraph state machine (Supervisor $\rightarrow$ Fast-Lane Worker $\rightarrow$ Guardrail Pass $\rightarrow$ Audit Log):
 
 ```bash
 PYTHONPATH=backend ./venv/bin/python3 scripts/interactive_test.py
 ```
 
 ### 5.2 Automated Pytest Benchmark Suite
-Execute the automated unit and integration tests (30 supervisor routing benchmark tasks, 3-tier policy checks, budget caps):
+Execute all 12 automated unit and integration tests (30 supervisor routing benchmark tasks, Fast-Lane execution, guardrail checks, 3-tier policy allowlists, budget caps):
 
 ```bash
-TESTING=1 PYTHONPATH=backend ./venv/bin/python3 -m pytest tests/
+TESTING=1 PYTHONPATH=backend ./venv/bin/python3 -m pytest tests/ -v
 ```
 
 ### 5.3 Manual REST API Testing (Swagger / cURL)
-Test the classification API directly:
 
-```bash
-curl -X POST "http://localhost:8000/api/supervisor/classify" \
-     -H "Content-Type: application/json" \
-     -d '{"prompt": "Delete all outdated user records from production database."}'
-```
+1. **Test Supervisor Classification Endpoint:**
+   ```bash
+   curl -X POST "http://localhost:8000/api/supervisor/classify" \
+        -H "Content-Type: application/json" \
+        -d '{"prompt": "Delete all outdated user records from production database."}'
+   ```
+
+2. **Test End-to-End Workflow Execution Endpoint (Phase 2):**
+   ```bash
+   curl -X POST "http://localhost:8000/api/workflow/execute" \
+        -H "Content-Type: application/json" \
+        -d '{"prompt": "Explain the difference between REST and GraphQL in 3 bullet points."}'
+   ```
 
 ---
 

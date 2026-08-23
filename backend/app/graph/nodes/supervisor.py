@@ -23,20 +23,35 @@ RISK FACTORS TO EVALUATE:
 3. Domain Risk: GENERAL (0.0) vs SENSITIVE/FINANCIAL/LEGAL (0.7) vs PRODUCTION_MUTATION (1.0).
 4. Complexity: SINGLE_STEP (0.0) vs MULTI_STEP (0.5) vs HIGHLY_DEPENDENT (1.0).
 
-OUTPUT FORMAT:
-You MUST respond with ONLY a valid JSON object formatted exactly as follows:
+EXAMPLES:
+Low-Risk Task (Writing a code snippet or explanation):
 {
   "task_type": "CODE_GENERATION",
-  "risk_score": 0.75,
+  "risk_score": 0.20,
+  "lane": "fast_lane",
+  "confidence": 0.95,
+  "risk_factors": {
+    "reversibility": "READ_ONLY",
+    "ambiguity": "SINGLE_INTERPRETATION",
+    "domain_risk": "GENERAL",
+    "complexity": "SINGLE_STEP"
+  },
+  "rationale": "Task involves writing an informational code snippet with no external side-effects."
+}
+
+High-Risk Task (Database modification or deployment):
+{
+  "task_type": "EXTERNAL_ACTION",
+  "risk_score": 0.85,
   "lane": "governed_lane",
-  "confidence": 0.90,
+  "confidence": 0.95,
   "risk_factors": {
     "reversibility": "IRREVERSIBLE",
     "ambiguity": "SINGLE_INTERPRETATION",
     "domain_risk": "PRODUCTION_MUTATION",
     "complexity": "MULTI_STEP"
   },
-  "rationale": "Task involves updating source files and building deployment containers."
+  "rationale": "Task modifies production tables or pushes code to deployment environments."
 }
 
 RULES FOR LANE ROUTING:
@@ -60,7 +75,16 @@ class SupervisorNode:
         ]
         
         response = await model.ainvoke(messages)
-        content = response.content if hasattr(response, "content") else str(response)
+        raw_content = getattr(response, "content", response)
+        if isinstance(raw_content, str):
+            content = raw_content
+        elif isinstance(raw_content, list):
+            content = "".join(
+                item if isinstance(item, str) else item.get("text", str(item)) if isinstance(item, dict) else str(item)
+                for item in raw_content
+            )
+        else:
+            content = str(raw_content)
         
         # Extract token usage metadata if present
         usage = getattr(response, "usage_metadata", {}) or {}
@@ -132,16 +156,17 @@ class SupervisorNode:
     def _heuristic_fallback(cls, prompt: str) -> Dict[str, Any]:
         prompt_lower = prompt.lower()
         high_risk_keywords = [
-            "delete", "drop", "deploy", "send", "exec", "pay", "refactor", 
-            "grant", "permission", "modify", "truncate", "remove", "migrate", 
-            "webhook", "commit", "push", "billing", "hotfix"
+            "delete", "drop", "deploy", "send email", "exec", "pay", 
+            "grant", "permission", "truncate", "remove record", "migrate db", 
+            "webhook", "git push", "git commit", "billing", "hotfix"
         ]
-        is_high_risk = any(kw in prompt_lower for kw in high_risk_keywords) or (
-            "write code" in prompt_lower or "write to" in prompt_lower or "file write" in prompt_lower
-        )
+        is_high_risk = any(kw in prompt_lower for kw in high_risk_keywords)
+        is_code_gen = "write" in prompt_lower or "code" in prompt_lower or "function" in prompt_lower or "script" in prompt_lower
+        
+        task_type = "EXTERNAL_ACTION" if is_high_risk else ("CODE_GENERATION" if is_code_gen else "RESEARCH")
         
         return {
-            "task_type": "EXTERNAL_ACTION" if is_high_risk else "RESEARCH",
+            "task_type": task_type,
             "risk_score": 0.80 if is_high_risk else 0.20,
             "lane": "governed_lane" if is_high_risk else "fast_lane",
             "confidence": 0.85,

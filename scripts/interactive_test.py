@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """
 Havenkeep Free Interactive Test Harness
-Allows zero-cost testing of Supervisor Risk Routing, Policy Engine checks, 
-Audit Logging, and Budget Tracker without requiring paid API keys.
+Allows testing of Supervisor Risk Routing, Fast-Lane Worker execution, Guardrails,
+Policy Engine checks, Audit Logging, and Budget Tracker.
 """
 
 import sys
@@ -14,10 +14,8 @@ from pathlib import Path
 backend_path = Path(__file__).resolve().parent.parent / "backend"
 sys.path.insert(0, str(backend_path))
 
-from app.graph.nodes.supervisor import SupervisorNode
+from app.graph.workflow import havenkeep_app
 from app.governance.policy_engine import PolicyEngine
-from app.governance.cost_tracker import CostTracker
-from app.governance.audit_logger import AuditLogger
 from app.graph.state import HavenkeepState
 
 SAMPLE_PROMPTS = [
@@ -62,47 +60,32 @@ async def run_interactive_test(prompt: str, session_cost: float = 0.0):
         "final_output": None
     }
 
-    # 2. Run Supervisor Node (Risk Classifier)
-    print("\n🔍 STEP 1: SUPERVISOR ROUTER EVALUATION")
-    result = await SupervisorNode.run(state)
+    # 2. Run Full Workflow State Machine
+    print("\n⚙️ EXECUTING HAVENKEEP WORKFLOW ENGINE...")
+    result = await havenkeep_app.ainvoke(state)
     
-    print(f"  • Task Type:   {result['task_type']}")
-    print(f"  • Risk Score:  {result['risk_score']:.2f} / 1.00")
-    print(f"  • Selected Lane: {result['lane'].upper()}")
-    print(f"  • Confidence:  {result['confidence']:.2f}")
+    print(f"\n🔍 ROUTING & SCORING SUMMARY:")
+    print(f"  • Task Type:      {result.get('task_type')}")
+    print(f"  • Risk Score:     {result.get('risk_score', 0.0):.2f} / 1.00")
+    print(f"  • Selected Lane:  {result.get('lane', 'fast_lane').upper()}")
+    print(f"  • Confidence:     {result.get('confidence', 0.0):.2f}")
 
-    # 3. Policy Engine Evaluation Simulation
-    print("\n🛡️ STEP 2: SHIFT-LEFT POLICY ENGINE EVALUATION")
-    sample_tools = {
-        "fast_lane": ("file_read", {"path": "docs/readme.txt"}),
-        "governed_lane": ("database_write", {"query": "DELETE FROM users WHERE 1=1;"})
-    }
-    tool_name, tool_args = sample_tools[result['lane']]
-    verdict = PolicyEngine.evaluate_tool_call(
-        agent_role="worker" if result['lane'] == "fast_lane" else "executor",
-        tool_name=tool_name,
-        tool_args=tool_args
-    )
-    
-    print(f"  • Simulated Tool:   {tool_name}")
-    print(f"  • Action Tier:      {verdict.tier}")
-    print(f"  • Policy Verdict:   {verdict.verdict}")
-    print(f"  • Human Interrupt:  {'YES (Paused for User Approval)' if verdict.requires_human_interrupt else 'NO (Auto-Approved)'}")
-    print(f"  • Policy Reason:    {verdict.reason}")
+    print(f"\n📝 WORKER & GUARDRAIL OUTPUT:")
+    print(f"  • Critic Verdict: {result.get('critic_verdict', 'N/A')}")
+    print(f"  • Final Response: {result.get('final_output', '')[:300]}...")
 
-    # 4. Cost Tracker & Budget Cap Summary
-    print("\n💰 STEP 3: COST TRACKER & BUDGET SUMMARY")
-    print(f"  • Task Cost:       ${result['cumulative_cost_usd'] - session_cost:.6f}")
-    print(f"  • Session Total:   ${result['cumulative_cost_usd']:.6f} / ${state['hard_budget_usd']:.2f}")
-    print(f"  • Budget Status:   {'⚠️ SOFT WARNING REACHED' if result['cumulative_cost_usd'] >= 0.50 else '✅ WITHIN BUDGET'}")
+    print(f"\n💰 COST & TOKEN SUMMARY:")
+    print(f"  • Prompt Tokens:  {result.get('cumulative_prompt_tokens', 0)}")
+    print(f"  • Completion Tkn: {result.get('cumulative_completion_tokens', 0)}")
+    print(f"  • Cumulative USD: ${result.get('cumulative_cost_usd', 0.0):.6f} / ${state['hard_budget_usd']:.2f}")
     
     print("="*70 + "\n")
-    return result['cumulative_cost_usd']
+    return result.get('cumulative_cost_usd', 0.0)
 
 async def main():
     print("""
- 🛡️ HAVENKEEP FREE INTERACTIVE TEST HARNESS 🛡️
- Testing dynamic risk scoring, policy allowlists, and cost tracking (100% Free / Zero API cost).
+ 🛡️ HAVENKEEP INTERACTIVE TEST HARNESS 🛡️
+ Testing dynamic risk scoring, Fast-Lane execution, guardrails, policy allowlists, and cost tracking.
 """)
     
     session_cost = 0.0

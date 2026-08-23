@@ -32,7 +32,8 @@ Welcome to the **Havenkeep** repository! This document contains project-specific
 
 ## 3. Maintenance & Testing Checklist
 
-Before completing any feature or fix:
-- Run `pytest tests/` to verify all governance, router, and state machine tests pass.
-- Verify Docker Compose builds cleanly (`docker-compose build`).
-- Ensure audit logging fields match the database schema defined in `backend/app/db/models.py`.
+Before completing any feature, fix, or node implementation:
+- **Run Automated Test Suite:** Execute `TESTING=1 PYTHONPATH=backend ./venv/bin/pytest tests/ -v` to verify all governance, router, fast-lane, and state machine tests pass (12/12 passing baseline).
+- **Run Interactive Test Harness / API Execution:** Verify task prompt execution through `/api/workflow/execute` and `/api/supervisor/classify` per [docs/TESTING.md](docs/TESTING.md).
+- **Verify Docker Compose:** Ensure Docker Compose builds cleanly (`docker-compose build`).
+- **Audit Logging Verification:** Ensure every node logs transitions to `AuditLogger.log_event` and fields match the database schema in `backend/app/db/models.py`.

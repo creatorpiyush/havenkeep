@@ -16,7 +16,7 @@ from app.api.routes import router as api_router
 app = FastAPI(
     title="Havenkeep API Gateway",
     description="Multi-Agent Orchestration Engine with Built-in Governance",
-    version="0.1.0",
+    version="0.2.0",
     lifespan=lifespan
 )
 

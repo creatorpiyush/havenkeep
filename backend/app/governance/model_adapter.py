@@ -35,6 +35,9 @@ class ModelProviderAdapter:
         if mock_responses:
             return FakeListChatModel(responses=mock_responses)
             
+        if os.getenv("TESTING") == "1":
+            return ModelProviderAdapter._get_mock_model(role)
+
         role_map = {
             "supervisor": (settings.supervisor_provider, settings.supervisor_model),
             "planner": (settings.planner_provider, settings.planner_model),
@@ -50,8 +53,6 @@ class ModelProviderAdapter:
 
         # 1. Ollama (Local Provider)
         if provider_lower == "ollama":
-            if os.getenv("TESTING") == "1":
-                return ModelProviderAdapter._get_mock_model()
             try:
                 from langchain_ollama import ChatOllama
                 return ChatOllama(
@@ -61,7 +62,7 @@ class ModelProviderAdapter:
                 )
             except Exception as e:
                 logger.warning(f"Could not initialize ChatOllama for model '{model_name}': {e}. Falling back to mock model.")
-                return ModelProviderAdapter._get_mock_model()
+                return ModelProviderAdapter._get_mock_model(role)
 
         # 2. Google Gemini / Google GenAI
         if provider_lower in ("google", "google_genai", "gemini"):
@@ -131,10 +132,13 @@ class ModelProviderAdapter:
 
         # 6. OpenAI API
         if provider_lower == "openai":
-            api_key = settings.openai_api_key or os.getenv("OPENAI_API_KEY") or "mock_key_for_custom_endpoint"
-            if not api_key and not settings.openai_base_url:
-                logger.info(f"OpenAI API key absent for role '{role}'. Using mock/heuristic fallback.")
-                return ModelProviderAdapter._get_mock_model()
+            api_key = settings.openai_api_key or os.getenv("OPENAI_API_KEY")
+            if not api_key:
+                if settings.openai_base_url:
+                    api_key = "mock_key_for_custom_endpoint"
+                else:
+                    logger.info(f"OpenAI API key absent for role '{role}'. Using mock/heuristic fallback.")
+                    return ModelProviderAdapter._get_mock_model(role)
             try:
                 from langchain_openai import ChatOpenAI
                 kwargs = {"model_name": model_name, "openai_api_key": api_key, "temperature": temperature}
@@ -143,7 +147,7 @@ class ModelProviderAdapter:
                 return ChatOpenAI(**kwargs)
             except Exception as e:
                 logger.warning(f"Error initializing ChatOpenAI: {e}")
-                return ModelProviderAdapter._get_mock_model()
+                return ModelProviderAdapter._get_mock_model(role)
 
         # Universal standard init_chat_model attempt
         try:
@@ -154,8 +158,15 @@ class ModelProviderAdapter:
                 temperature=temperature,
             )
         except Exception:
-            return ModelProviderAdapter._get_mock_model()
+            return ModelProviderAdapter._get_mock_model(role)
 
     @staticmethod
-    def _get_mock_model() -> BaseChatModel:
-        return FakeListChatModel(responses=['{"task_type": "GENERAL_QA", "risk_score": 0.2, "lane": "fast_lane", "confidence": 0.95}'])
+    def _get_mock_model(role: str = "worker") -> BaseChatModel:
+        role_lower = role.lower()
+        if role_lower == "supervisor":
+            res = '{"task_type": "GENERAL_QA", "risk_score": 0.2, "lane": "fast_lane", "confidence": 0.95}'
+        elif role_lower in ("critic", "guardrail"):
+            res = '{"passed": true, "feedback": "Response passed quality guardrails.", "adjusted_output": null}'
+        else:
+            res = "Synchronous execution blocks the current thread until completion, while asynchronous execution yields execution during I/O operations."
+        return FakeListChatModel(responses=[res])

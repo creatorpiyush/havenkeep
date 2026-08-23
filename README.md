@@ -8,11 +8,12 @@ Havenkeep is a multi-agent orchestration framework designed for safe, cost-bound
 
 ## 📚 Documentation Index
 
-- [🧠 **Concept & Core Philosophy**](file:///Users/piyush.anand/self_code/havenkeep/docs/CONCEPT.md) — What is an AI harness? Layman explanation of Havenkeep's goals and architecture.
-- [🛠️ **Setup & Installation Guide**](file:///Users/piyush.anand/self_code/havenkeep/docs/SETUP.md) — Detailed environment setup, Docker/Podman compose, local dev, and testing instructions.
-- [📐 **Technical Architecture Specification**](file:///Users/piyush.anand/self_code/havenkeep/ARCHITECTURE.md) — System design, risk scoring math, LangGraph state machine, policy engine, and SSE protocols.
-- [📋 **Phased Implementation Plan**](file:///Users/piyush.anand/self_code/havenkeep/multi_agent_harness_implementation_plan.md) — Multi-phase build roadmap and governance invariants.
-- [📜 **Changelog & Version History**](file:///Users/piyush.anand/self_code/havenkeep/CHANGELOG.md) — Detailed release logs and version notes (Current version: `v0.1.0`).
+- [🧠 **Concept & Core Philosophy**](docs/CONCEPT.md) — What is an AI harness? Layman explanation of Havenkeep's goals and architecture.
+- [🛠️ **Setup & Installation Guide**](docs/SETUP.md) — Detailed environment setup, Docker/Podman compose, local dev, and testing instructions.
+- [🧪 **Manual & Regression Testing Guide**](docs/TESTING.md) — Step-by-step cURL scenarios, CLI harness, and automated regression test matrix.
+- [📐 **Technical Architecture Specification**](ARCHITECTURE.md) — System design, risk scoring math, LangGraph state machine, policy engine, and SSE protocols.
+- [📋 **Phased Implementation Plan**](multi_agent_harness_implementation_plan.md) — Multi-phase build roadmap and governance invariants.
+- [📜 **Changelog & Version History**](CHANGELOG.md) — Detailed release logs and version notes (Current version: `v0.2.0`).
 
 ---
 
@@ -57,9 +58,9 @@ User <-> Interactive UI (Next.js @ Port 3000)
 ### 1. Shift-Left Governance (Phase 1 Complete)
 Audit logging, 3-tier policy allowlist enforcement, token usage tracking, and model provider abstractions are established as core primitives called by every agent node from day one.
 
-### 2. Dual-Lane Dynamic Routing
-- **Fast-Lane:** Low-stakes tasks (e.g. read-only Q&A, research) execute via lightweight specialized worker agents with minimal token overhead and fast latency.
-- **Governed-Lane:** High-stakes or multi-step tasks run through a **Planner → Executor → Critic** self-correction loop with durable human-in-the-loop approval gates.
+### 2. Dual-Lane Dynamic Routing & Fast-Lane Orchestration (Phase 2 Complete)
+- **Fast-Lane:** Low-stakes tasks (`RESEARCH`, `CODE_GENERATION`, `DATA_ANALYSIS`, `GENERAL_QA`) execute via specialized worker agents (`FastLaneWorkerNode`) with minimal token overhead and low latency, verified by a checklist guardrail pass (`FastLaneGuardrailNode`).
+- **Governed-Lane:** High-stakes or multi-step tasks run through a **Planner → Executor → Critic** self-correction loop with durable human-in-the-loop approval gates (Phase 3).
 
 ### 3. Human-in-the-Loop (`interrupt`) & Per-Plan Approval
 - Native LangGraph `interrupt()` pauses execution at critical decision points and persists graph state directly to PostgreSQL.
@@ -104,7 +105,7 @@ docker-compose up --build -d
 - **Frontend GUI:** `http://localhost:3000`
 - **FastAPI API & Swagger Docs:** `http://localhost:8000/docs`
 
-For detailed manual setup, local python virtualenv execution, and interactive testing CLI options, see the [Setup Guide](file:///Users/piyush.anand/self_code/havenkeep/docs/SETUP.md).
+For detailed manual setup, local python virtualenv execution, and interactive testing CLI options, see the [Setup Guide](docs/SETUP.md).
 
 ---
 
