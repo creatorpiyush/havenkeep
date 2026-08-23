@@ -1,4 +1,5 @@
 import pytest
+from langgraph.types import Command
 from app.graph.state import HavenkeepState
 from app.graph.workflow import havenkeep_app
 from app.governance.model_adapter import ModelProviderAdapter
@@ -37,7 +38,14 @@ async def test_governed_lane_end_to_end_execution():
         "final_output": None
     }
 
-    final_state = await havenkeep_app.ainvoke(initial_state)
+    config = {"configurable": {"thread_id": initial_state["session_id"]}}
+    state_step1 = await havenkeep_app.ainvoke(initial_state, config=config)
+
+    # If execution paused at ApprovalGate interrupt for Tier 1 action, send approval resume
+    if state_step1.get("approval_required") or state_step1.get("pending_tool_call"):
+        final_state = await havenkeep_app.ainvoke(Command(resume={"status": "APPROVED"}), config=config)
+    else:
+        final_state = state_step1
 
     assert final_state["lane"] == "governed_lane"
     assert len(final_state["plan_steps"]) > 0
@@ -80,7 +88,7 @@ async def test_governed_lane_approval_flag_on_tier1_action():
         "final_output": None
     }
 
-    final_state = await havenkeep_app.ainvoke(initial_state)
+    final_state = await havenkeep_app.ainvoke(initial_state, config={"configurable": {"thread_id": initial_state["session_id"]}})
 
     assert final_state["approval_required"] is True
     assert final_state["pending_tool_call"] is not None

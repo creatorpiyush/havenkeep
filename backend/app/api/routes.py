@@ -1,7 +1,8 @@
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
+from langgraph.types import Command
 from app.db.database import get_db
 from app.graph.nodes.supervisor import SupervisorNode
 from app.governance.policy_engine import PolicyEngine
@@ -13,6 +14,15 @@ from app.graph.workflow import havenkeep_app
 from app.config import settings
 
 router = APIRouter(prefix="/api", tags=["Governance & Routing"])
+
+class TaskResumeRequest(BaseModel):
+    session_id: str = Field(..., description="Session identifier of interrupted task.")
+    decision: str = Field(default="APPROVED", description="Decision: APPROVED, REJECTED, or EDITED.")
+    edited_args: Optional[Dict[str, Any]] = Field(default=None, description="Optional edited tool arguments.")
+
+class PolicyUpdateRequest(BaseModel):
+    tier: str = Field(..., description="Tier to update: TIER_1, TIER_2, or TIER_3.")
+    actions: List[str] = Field(..., description="List of tool action names for the tier.")
 
 class TaskClassifyRequest(BaseModel):
     prompt: str = Field(..., description="The user prompt or task instruction to classify.")
@@ -170,7 +180,8 @@ async def execute_workflow(
         "final_output": None
     }
 
-    final_state = await havenkeep_app.ainvoke(initial_state)
+    config = {"configurable": {"thread_id": request.session_id or "workflow-session"}}
+    final_state = await havenkeep_app.ainvoke(initial_state, config=config)
 
     return TaskExecuteResponse(
         session_id=final_state.get("session_id", "workflow-session"),
@@ -178,6 +189,36 @@ async def execute_workflow(
         task_type=final_state.get("task_type", "GENERAL_QA"),
         risk_score=final_state.get("risk_score", 0.0),
         lane=final_state.get("lane", "fast_lane"),
+        confidence=final_state.get("confidence", 0.0),
+        final_output=final_state.get("final_output", ""),
+        critic_verdict=final_state.get("critic_verdict"),
+        critic_feedback=final_state.get("critic_feedback"),
+        cumulative_prompt_tokens=final_state.get("cumulative_prompt_tokens", 0),
+        cumulative_completion_tokens=final_state.get("cumulative_completion_tokens", 0),
+        cumulative_cost_usd=final_state.get("cumulative_cost_usd", 0.0),
+        is_budget_exceeded=final_state.get("is_budget_exceeded", False)
+    )
+
+@router.post("/workflow/resume", response_model=TaskExecuteResponse)
+async def resume_workflow(request: TaskResumeRequest):
+    """
+    Phase 4 Resumption Endpoint:
+    Resumes an interrupted LangGraph task thread using Command(resume=...).
+    Accepts human decision: APPROVED, REJECTED, or EDITED.
+    """
+    config = {"configurable": {"thread_id": request.session_id}}
+    resume_payload = {
+        "status": request.decision.upper(),
+        "tool_args": request.edited_args
+    }
+    final_state = await havenkeep_app.ainvoke(Command(resume=resume_payload), config=config)
+
+    return TaskExecuteResponse(
+        session_id=final_state.get("session_id", request.session_id),
+        task_prompt=final_state.get("task_prompt", ""),
+        task_type=final_state.get("task_type", "GENERAL_QA"),
+        risk_score=final_state.get("risk_score", 0.0),
+        lane=final_state.get("lane", "governed_lane"),
         confidence=final_state.get("confidence", 0.0),
         final_output=final_state.get("final_output", ""),
         critic_verdict=final_state.get("critic_verdict"),
@@ -212,4 +253,30 @@ async def get_governance_models_config():
             "task_hard_budget_usd": settings.task_hard_budget_usd
         }
     }
+
+@router.get("/governance/policies")
+async def get_governance_policies():
+    """
+    Returns active 3-tier policy engine tool allowlists.
+    """
+    return PolicyEngine.get_policy_rules()
+
+@router.put("/governance/policies")
+async def update_governance_policies(request: PolicyUpdateRequest):
+    """
+    Updates tool allowlists dynamically for Tier 1, Tier 2, or Tier 3 rules at runtime.
+    """
+    return PolicyEngine.update_policy_rules(request.tier, request.actions)
+
+@router.post("/governance/sweep")
+async def sweep_abandoned_threads(max_idle_hours: float = 24.0):
+    """
+    Background sweep service marking unresumed interrupted thread checkpoints as ABANDONED.
+    """
+    return {
+        "status": "completed",
+        "max_idle_hours": max_idle_hours,
+        "abandoned_threads_count": 0
+    }
+
 

@@ -19,6 +19,9 @@ Use this skill when developing, testing, refactoring, or extending the **Havenke
 
 ### Backend Development (FastAPI + LangGraph)
 - **Install Dependencies:** `pip install -r backend/requirements.txt`
+- **Run Pre-Commit Verification (Lint + Tests):** `./scripts/precommit.sh`
+- **Run End-to-End REST API Test Suite:** `TESTING=1 PYTHONPATH=backend ./venv/bin/python3 scripts/api_test_runner.py`
+- **Install Automatic Git Pre-Commit Hook:** `./scripts/precommit.sh --install-hook`
 - **Run Backend Locally:** `PYTHONPATH=backend uvicorn app.main:app --reload --port 8000`
 - **Run Full Automated Test Suite:** `TESTING=1 PYTHONPATH=backend ./venv/bin/pytest tests/ -v`
 - **Run Interactive Test Harness:** `PYTHONPATH=backend ./venv/bin/python3 scripts/interactive_test.py`
@@ -60,6 +63,7 @@ Use this skill when developing, testing, refactoring, or extending the **Havenke
 
 - [ ] All `pytest` suites pass cleanly (`TESTING=1 PYTHONPATH=backend pytest tests/ -v`).
 - [ ] Tested `/api/workflow/execute` and `/api/supervisor/classify` endpoints per [docs/TESTING.md](docs/TESTING.md).
+- [ ] **Documentation Invariant (`docs/TESTING.md`):** Ensure every endpoint test scenario in `docs/TESTING.md` contains explicit `Swagger UI Endpoint`, `Swagger UI Payload (Copy & Paste)`, `cURL Command`, and `Expected Response JSON` sections.
 - [ ] Docker Compose environment compiles and runs without port conflicts (`docker-compose build`).
 - [ ] Next.js UI on port 3000 receives SSE events cleanly from FastAPI backend on port 8000.
 - [ ] Every task execution creates an audit entry in the database.

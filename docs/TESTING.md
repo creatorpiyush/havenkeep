@@ -1,6 +1,6 @@
 # Havenkeep Manual & Regression Testing Guide 🧪
 
-This guide contains step-by-step manual test scenarios, cURL regression commands, and automated test instructions for validating **Phase 1 (Governance Primitives & Supervisor Risk Router)**, **Phase 2 (Fast-Lane Worker & Guardrail Orchestration)**, and **Phase 3 (Governed-Lane Planner $\rightarrow$ Executor $\rightarrow$ Critic Orchestration & Dynamic Cost Pricing)**.
+This guide contains step-by-step manual test scenarios, cURL regression commands, and automated test instructions for validating **Phase 1 (Governance Primitives)**, **Phase 2 (Fast-Lane Worker)**, **Phase 3 (Governed-Lane & Dynamic Pricing)**, and **Phase 4 (Governance Layer: Approval Gate, Policy APIs & Thread Sweeps)**.
 
 ---
 
@@ -8,20 +8,21 @@ This guide contains step-by-step manual test scenarios, cURL regression commands
 
 | Test Suite / Scenario | Purpose | Command / Endpoint | Expected Outcome |
 | :--- | :--- | :--- | :--- |
-| **1. Automated Pytest Suite** | Unit & integration tests | `TESTING=1 PYTHONPATH=backend pytest tests/ -v` | 16/16 Passed (0.5s) |
+| **1. Automated Pytest Suite** | Unit & integration tests | `TESTING=1 PYTHONPATH=backend pytest tests/ -v` | 19/19 Passed (0.4s) |
 | **2. Interactive CLI Harness** | Terminal manual test | `PYTHONPATH=backend python scripts/interactive_test.py` | Interactive prompt execution |
-| **3. Supervisor Classification** | Risk Scoring & Policy Check | `POST /api/supervisor/classify` | `lane`, `risk_score`, `simulated_policy_check` |
-| **4. Low-Risk Research Query** | Fast-Lane execution | `POST /api/workflow/execute` | `lane: "fast_lane"`, `critic: "PASS"` |
-| **5. High-Risk Governed Query** | Governed-Lane execution | `POST /api/workflow/execute` | `lane: "governed_lane"`, `critic_verdict` |
-| **6. Code Generation Query** | Specialized Code Worker | `POST /api/workflow/execute` | `task_type: "CODE_GENERATION"`, formatted code |
-| **7. Model Config Inspection** | Governance models lookup | `GET /api/governance/models` | Active role bindings & pricing table |
-| **8. Budget Cap Limit Check** | Budget halt enforcement | `POST /api/workflow/execute` | `is_budget_exceeded: true` |
+| **3. Human Approval Resumption** | Resume interrupted task | `POST /api/workflow/resume` | Resumes paused thread with `APPROVED` |
+| **4. Dynamic Policy Rules** | Runtime policy allowlist edit | `GET/PUT /api/governance/policies` | Updates Tier 1/2/3 tool rules |
+| **5. Thread TTL Abandon Sweep** | Idle checkpoint cleanup | `POST /api/governance/sweep` | Sweeps abandoned threads |
+| **6. Supervisor Classification** | Risk Scoring & Policy Check | `POST /api/supervisor/classify` | `lane`, `risk_score`, `simulated_policy_check` |
+| **7. Low-Risk Research Query** | Fast-Lane execution | `POST /api/workflow/execute` | `lane: "fast_lane"`, `critic: "PASS"` |
+| **8. High-Risk Governed Query** | Governed-Lane execution | `POST /api/workflow/execute` | `lane: "governed_lane"`, `critic_verdict` |
+| **9. Model Config Inspection** | Governance models lookup | `GET /api/governance/models` | Active role bindings & pricing table |
 
 ---
 
 ## 🛠️ Section 1: Automated Regression Testing
 
-Run the full automated Pytest suite covering all 16 test modules:
+Run the full automated Pytest suite covering all 19 test modules:
 
 ```bash
 TESTING=1 PYTHONPATH=backend ./venv/bin/pytest tests/ -v
@@ -362,10 +363,131 @@ curl -X GET "http://localhost:8000/api/governance/models"
 
 ---
 
-## 🔍 Section 5: Regression Pre-Release Checklist
+---
+
+## 🛑 Section 5: Phase 4 Governance Layer APIs (Approval Gate & Policies)
+
+### Scenario 5.1: Human Approval Interruption Resumption ✋
+
+**Goal:** Resume an interrupted task thread paused at `ApprovalGateNode` using `POST /api/workflow/resume`.
+
+**Swagger UI Endpoint:** `POST /api/workflow/resume`
+
+**Swagger UI Payload (Copy & Paste):**
+```json
+{
+  "session_id": "test-governed-01",
+  "decision": "APPROVED"
+}
+```
+
+**cURL Command:**
+```bash
+curl -X POST "http://localhost:8000/api/workflow/resume" \
+     -H "Content-Type: application/json" \
+     -d '{
+       "session_id": "test-governed-01",
+       "decision": "APPROVED"
+     }'
+```
+
+**Expected Response JSON:**
+```json
+{
+  "session_id": "test-governed-01",
+  "task_prompt": "DELETE FROM users WHERE active = false; DROP TABLE logs;",
+  "task_type": "EXTERNAL_ACTION",
+  "risk_score": 0.95,
+  "lane": "governed_lane",
+  "confidence": 0.98,
+  "final_output": "Governed plan execution completed safely under policy allowlist supervision.",
+  "critic_verdict": "PASS",
+  "is_budget_exceeded": false
+}
+```
+
+---
+
+### Scenario 5.2: Dynamic Policy Rules Inspection & Update 🛡️
+
+**Goal:** View and update 3-tier action allowlists (`PolicyEngine`) dynamically at runtime.
+
+#### GET /api/governance/policies (Inspect Active Rules)
+**Swagger UI Endpoint:** `GET /api/governance/policies`
+
+**cURL Command:**
+```bash
+curl -X GET "http://localhost:8000/api/governance/policies"
+```
+
+**Expected Response JSON:**
+```json
+{
+  "tier_1_actions": ["database_write", "deploy_command", "external_http_post", "file_delete"],
+  "tier_2_actions": ["file_write", "git_commit", "git_push"],
+  "tier_3_actions": ["database_read_scoped", "file_read", "internal_compute", "web_search"]
+}
+```
+
+#### PUT /api/governance/policies (Update Allowlist Rules)
+**Swagger UI Endpoint:** `PUT /api/governance/policies`
+
+**Swagger UI Payload (Copy & Paste):**
+```json
+{
+  "tier": "TIER_1",
+  "actions": ["database_write", "file_delete", "deploy_command", "custom_highrisk_tool"]
+}
+```
+
+**cURL Command:**
+```bash
+curl -X PUT "http://localhost:8000/api/governance/policies" \
+     -H "Content-Type: application/json" \
+     -d '{
+       "tier": "TIER_1",
+       "actions": ["database_write", "file_delete", "deploy_command", "custom_highrisk_tool"]
+     }'
+```
+
+**Expected Response JSON:**
+```json
+{
+  "tier_1_actions": ["custom_highrisk_tool", "database_write", "deploy_command", "file_delete"],
+  "tier_2_actions": ["file_write", "git_commit", "git_push"],
+  "tier_3_actions": ["database_read_scoped", "file_read", "internal_compute", "web_search"]
+}
+```
+
+---
+
+### Scenario 5.3: Thread TTL Abandonment Sweep 🧹
+
+**Goal:** Trigger background sweep service marking unresumed interrupted thread checkpoints as `ABANDONED`.
+
+**Swagger UI Endpoint:** `POST /api/governance/sweep`
+
+**cURL Command:**
+```bash
+curl -X POST "http://localhost:8000/api/governance/sweep?max_idle_hours=24.0"
+```
+
+**Expected Response JSON:**
+```json
+{
+  "status": "completed",
+  "max_idle_hours": 24.0,
+  "abandoned_threads_count": 0
+}
+```
+
+---
+
+## 🔍 Section 6: Regression Pre-Release Checklist
 
 Before committing new agent nodes or routing rules, verify:
-1. `TESTING=1 PYTHONPATH=backend pytest tests/` passes 100% of tests (16/16).
+1. `TESTING=1 PYTHONPATH=backend pytest tests/` passes 100% of tests (19/19).
 2. Every node logs `AuditLogger.log_event` with session ID, cost, and payload.
 3. Model calls pass through `ModelProviderAdapter` without hardcoded vendor classes.
 4. Dynamic model pricing lookup uses `ModelProviderAdapter.get_model_name(role)` instead of hardcoded model pricing strings.
+5. Approval gates invoke `interrupt()` at node start before side-effects and handle `Command(resume=...)`.

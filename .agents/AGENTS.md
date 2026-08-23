@@ -11,6 +11,7 @@ Welcome to the **Havenkeep** repository! This document contains project-specific
 3. **LangGraph Interrupt Discipline:** `interrupt()` calls MUST be invoked at the start of approval nodes before any tool side-effects or external network calls to guarantee re-execution safety upon `Command(resume=...)`.
 4. **Model Provider Abstraction:** Never hardcode LLM vendor classes (e.g. `ChatAnthropic` or `ChatOpenAI`) directly in node files. Always instantiate chat models via `ModelProviderAdapter.get_model(role="...")` or LangChain's `init_chat_model`.
 5. **Port 3000 UI:** The Next.js frontend application must always be configured to run on **port 3000** to align with Docker Compose service mapping.
+6. **Relative Path Integrity:** Never hardcode machine-specific absolute file system paths (e.g. `/Users/...` or `/home/...`) in documentation markdown or code files. Always use relative workspace paths.
 
 ---
 
@@ -33,7 +34,9 @@ Welcome to the **Havenkeep** repository! This document contains project-specific
 ## 3. Maintenance & Testing Checklist
 
 Before completing any feature, fix, or node implementation:
-- **Run Automated Test Suite:** Execute `TESTING=1 PYTHONPATH=backend ./venv/bin/pytest tests/ -v` to verify all governance, router, fast-lane, governed-lane, and state machine tests pass (16/16 passing baseline).
+- **Run Pre-Commit Verification:** Execute `./scripts/precommit.sh` to run syntax compilation, linting checks, and the full 19/19 Pytest regression suite.
+- **Run Automated Test Suite:** Execute `TESTING=1 PYTHONPATH=backend ./venv/bin/pytest tests/ -v` to verify all governance, router, fast-lane, governed-lane, and state machine tests pass (19/19 passing baseline).
 - **Run Interactive Test Harness / API Execution:** Verify task prompt execution through `/api/workflow/execute` and `/api/supervisor/classify` per [docs/TESTING.md](docs/TESTING.md).
+- **Documentation Standard (`docs/TESTING.md`):** Every API endpoint scenario documented in `docs/TESTING.md` MUST explicitly include four mandatory subsections: (1) `Swagger UI Endpoint` label, (2) `Swagger UI Payload (Copy & Paste)` JSON block (if request body exists), (3) `cURL Command` block, and (4) `Expected Response JSON` block.
 - **Verify Docker Compose:** Ensure Docker Compose builds cleanly (`docker-compose build`).
 - **Audit Logging Verification:** Ensure every node logs transitions to `AuditLogger.log_event` and fields match the database schema in `backend/app/db/models.py`.

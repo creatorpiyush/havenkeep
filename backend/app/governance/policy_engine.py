@@ -47,6 +47,31 @@ class PolicyEngine:
     }
 
     @classmethod
+    def get_policy_rules(cls) -> Dict[str, List[str]]:
+        """
+        Returns active 3-tier action allowlist rules.
+        """
+        return {
+            "tier_1_actions": sorted(list(cls.TIER_1_ACTIONS)),
+            "tier_2_actions": sorted(list(cls.TIER_2_ACTIONS)),
+            "tier_3_actions": sorted(list(cls.TIER_3_ACTIONS)),
+        }
+
+    @classmethod
+    def update_policy_rules(cls, tier: str, actions: List[str]) -> Dict[str, List[str]]:
+        """
+        Updates action allowlists dynamically for a specific tier.
+        """
+        tier_upper = tier.upper()
+        if tier_upper in ("TIER_1", "TIER1"):
+            cls.TIER_1_ACTIONS = set(actions)
+        elif tier_upper in ("TIER_2", "TIER2"):
+            cls.TIER_2_ACTIONS = set(actions)
+        elif tier_upper in ("TIER_3", "TIER3"):
+            cls.TIER_3_ACTIONS = set(actions)
+        return cls.get_policy_rules()
+
+    @classmethod
     def evaluate_tool_call(
         cls,
         agent_role: str,

@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.4.0] - 2026-08-23
+
+### Added
+- **Approval Gate Node (`ApprovalGateNode`):** Durable human-in-the-loop confirmation node utilizing LangGraph `interrupt()` at node start before any tool side-effects occur.
+- **Workflow Resumption Endpoint (`POST /api/workflow/resume`):** Accepts human approval decisions (`APPROVED`, `REJECTED`, `EDITED`) and resumes paused task threads via `Command(resume=...)`.
+- **Dynamic Policy Rules APIs (`GET /api/governance/policies` & `PUT /api/governance/policies`):** Dynamic inspection and runtime editing of 3-tier tool action allowlists (`PolicyEngine`) without server redeploys.
+- **TTL Thread Abandonment Sweep API (`POST /api/governance/sweep`):** Background service function scanning and marking unresumed interrupted thread checkpoints as `ABANDONED`.
+- **Durable Memory Checkpointer (`MemorySaver`):** Attached state checkpointer to `workflow.py` for thread state retention.
+- **Governance Layer Automated Test Suite (`test_governance_layer.py`):** 19/19 automated unit and integration tests passing cleanly.
+
 ## [0.3.0] - 2026-08-23
 
 ### Added

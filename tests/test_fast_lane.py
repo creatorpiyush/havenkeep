@@ -37,7 +37,7 @@ async def test_fast_lane_end_to_end_execution():
         "final_output": None
     }
 
-    final_state = await havenkeep_app.ainvoke(initial_state)
+    final_state = await havenkeep_app.ainvoke(initial_state, config={"configurable": {"thread_id": initial_state["session_id"]}})
 
     assert final_state["lane"] == "fast_lane"
     assert final_state["final_output"] is not None
@@ -104,7 +104,7 @@ async def test_governed_lane_stub_routing():
         "final_output": None
     }
 
-    final_state = await havenkeep_app.ainvoke(initial_state)
+    final_state = await havenkeep_app.ainvoke(initial_state, config={"configurable": {"thread_id": initial_state["session_id"]}})
 
     assert final_state["lane"] == "governed_lane"
     assert len(final_state["plan_steps"]) > 0
