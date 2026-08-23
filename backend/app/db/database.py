@@ -36,3 +36,15 @@ async def get_db() -> AsyncGenerator[AsyncSession, None]:
 async def init_db() -> None:
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+        if "sqlite" in settings.database_url:
+            from sqlalchemy import text
+            for table, col in [
+                ("audit_logs", "cache_creation_tokens"),
+                ("audit_logs", "cache_read_tokens"),
+                ("cost_records", "cache_creation_tokens"),
+                ("cost_records", "cache_read_tokens")
+            ]:
+                try:
+                    await conn.execute(text(f"ALTER TABLE {table} ADD COLUMN {col} INTEGER DEFAULT 0"))
+                except Exception:
+                    pass

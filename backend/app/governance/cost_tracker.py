@@ -32,12 +32,16 @@ class CostTracker:
         cls, 
         model_name: str, 
         prompt_tokens: int, 
-        completion_tokens: int
+        completion_tokens: int,
+        cache_creation_tokens: int = 0,
+        cache_read_tokens: int = 0
     ) -> float:
         pricing = cls.PRICING_TABLE.get(model_name, cls.PRICING_TABLE["default"])
         input_cost = (prompt_tokens / 1_000_000.0) * pricing["input"]
         output_cost = (completion_tokens / 1_000_000.0) * pricing["output"]
-        return round(input_cost + output_cost, 6)
+        cache_creation_cost = (cache_creation_tokens / 1_000_000.0) * (pricing["input"] * 1.25)
+        cache_read_cost = (cache_read_tokens / 1_000_000.0) * (pricing["input"] * 0.10)
+        return round(input_cost + output_cost + cache_creation_cost + cache_read_cost, 6)
 
     @classmethod
     def update_and_check_budget(

@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.5.0] - 2026-08-23
+
+### Added
+- **Prompt Caching Accounting & Discounts (`CostTracker`):** Extended `CostTracker.calculate_cost()` and database models (`AuditLog`, `CostRecord`) to account for `cache_creation_tokens` (+25% surcharge) and `cache_read_tokens` (90% discount).
+- **Tool Result Caching Service (`ToolResultCache`):** In-memory and TTL-based caching layer (`backend/app/services/cache_service.py`) for deterministic, read-only tool invocation outputs (`file_read`, `web_search`, `database_read`).
+- **Context Compressor & Scratchpad Trimming (`ContextCompressor`):** Trimming and summarization utility (`backend/app/governance/context_compressor.py`) for multi-turn Governed-Lane agent history.
+- **Asynchronous Batch Processor (`BatchProcessor`):** Bulk worker service (`backend/app/services/batch_processor.py`) for parallel non-interactive classification.
+- **Governance Telemetry API (`GET /api/governance/metrics`):** Aggregated metrics endpoint returning total executions, lane distributions, cumulative cost, prompt cache savings, and critic verdicts.
+- **Phase 5 Automated Test Suite (`test_cost_optimization.py`):** 23/23 Pytest unit tests & 12/12 REST API integration test scenarios passing cleanly.
+
 ## [0.4.0] - 2026-08-23
 
 ### Added

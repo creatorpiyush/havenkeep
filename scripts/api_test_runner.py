@@ -14,6 +14,7 @@ from httpx import AsyncClient, ASGITransport
 sys.path.insert(0, "backend")
 
 from app.main import app
+from app.db.database import init_db
 
 GREEN = "\033[0;32m"
 RED = "\033[0;31m"
@@ -25,6 +26,8 @@ async def run_api_tests():
     print(f"{BLUE}===================================================={NC}")
     print(f"{BLUE}   🌐  Havenkeep End-to-End REST API Test Suite     {NC}")
     print(f"{BLUE}===================================================={NC}\n")
+
+    await init_db()
 
     passed_count = 0
     total_count = 0
@@ -169,6 +172,17 @@ async def run_api_tests():
             passed_count += 1
         else:
             print(f"{RED}✗ Thread sweep failed: {res.text}{NC}")
+
+        # Scenario 12: Governance Metrics Telemetry Lookup
+        total_count += 1
+        print(f"{YELLOW}[Test {total_count}] GET /api/governance/metrics (Metrics Telemetry Lookup){NC}")
+        res = await client.get("/api/governance/metrics")
+        data = res.json()
+        if res.status_code == 200 and "total_audit_events" in data and "lane_distribution" in data:
+            print(f"{GREEN}✓ Governance metrics telemetry retrieved successfully.{NC}")
+            passed_count += 1
+        else:
+            print(f"{RED}✗ Governance metrics lookup failed: {res.text}{NC}")
 
     print(f"\n{BLUE}===================================================={NC}")
     if passed_count == total_count:

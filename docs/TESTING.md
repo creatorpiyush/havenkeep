@@ -1,6 +1,6 @@
 # Havenkeep Manual & Regression Testing Guide 🧪
 
-This guide contains step-by-step manual test scenarios, cURL regression commands, and automated test instructions for validating **Phase 1 (Governance Primitives)**, **Phase 2 (Fast-Lane Worker)**, **Phase 3 (Governed-Lane & Dynamic Pricing)**, and **Phase 4 (Governance Layer: Approval Gate, Policy APIs & Thread Sweeps)**.
+This guide contains step-by-step manual test scenarios, cURL regression commands, and automated test instructions for validating **Phase 1 (Governance Primitives)**, **Phase 2 (Fast-Lane Worker)**, **Phase 3 (Governed-Lane & Dynamic Pricing)**, **Phase 4 (Governance Layer: Approval Gate, Policy APIs & Thread Sweeps)**, and **Phase 5 (Cost Optimization & Governance Telemetry)**.
 
 ---
 
@@ -8,15 +8,17 @@ This guide contains step-by-step manual test scenarios, cURL regression commands
 
 | Test Suite / Scenario | Purpose | Command / Endpoint | Expected Outcome |
 | :--- | :--- | :--- | :--- |
-| **1. Automated Pytest Suite** | Unit & integration tests | `TESTING=1 PYTHONPATH=backend pytest tests/ -v` | 19/19 Passed (0.4s) |
-| **2. Interactive CLI Harness** | Terminal manual test | `PYTHONPATH=backend python scripts/interactive_test.py` | Interactive prompt execution |
-| **3. Human Approval Resumption** | Resume interrupted task | `POST /api/workflow/resume` | Resumes paused thread with `APPROVED` |
-| **4. Dynamic Policy Rules** | Runtime policy allowlist edit | `GET/PUT /api/governance/policies` | Updates Tier 1/2/3 tool rules |
-| **5. Thread TTL Abandon Sweep** | Idle checkpoint cleanup | `POST /api/governance/sweep` | Sweeps abandoned threads |
-| **6. Supervisor Classification** | Risk Scoring & Policy Check | `POST /api/supervisor/classify` | `lane`, `risk_score`, `simulated_policy_check` |
-| **7. Low-Risk Research Query** | Fast-Lane execution | `POST /api/workflow/execute` | `lane: "fast_lane"`, `critic: "PASS"` |
-| **8. High-Risk Governed Query** | Governed-Lane execution | `POST /api/workflow/execute` | `lane: "governed_lane"`, `critic_verdict` |
-| **9. Model Config Inspection** | Governance models lookup | `GET /api/governance/models` | Active role bindings & pricing table |
+| **1. Automated Pytest Suite** | Unit & integration tests | `TESTING=1 PYTHONPATH=backend pytest tests/ -v` | 23/23 Passed (0.5s) |
+| **2. Pre-Commit Verification** | Full 4-step test runner | `./scripts/precommit.sh` | 100% Passed (Pytest + 12 API Scenarios) |
+| **3. Interactive CLI Harness** | Terminal manual test | `PYTHONPATH=backend python scripts/interactive_test.py` | Interactive prompt execution |
+| **4. Governance Telemetry API** | Telemetry metrics lookup | `GET /api/governance/metrics` | Total cost, cache savings, critic verdicts |
+| **5. Human Approval Resumption** | Resume interrupted task | `POST /api/workflow/resume` | Resumes paused thread with `APPROVED` |
+| **6. Dynamic Policy Rules** | Runtime policy allowlist edit | `GET/PUT /api/governance/policies` | Updates Tier 1/2/3 tool rules |
+| **7. Thread TTL Abandon Sweep** | Idle checkpoint cleanup | `POST /api/governance/sweep` | Sweeps abandoned threads |
+| **8. Supervisor Classification** | Risk Scoring & Policy Check | `POST /api/supervisor/classify` | `lane`, `risk_score`, `simulated_policy_check` |
+| **9. Low-Risk Research Query** | Fast-Lane execution | `POST /api/workflow/execute` | `lane: "fast_lane"`, `critic: "PASS"` |
+| **10. High-Risk Governed Query** | Governed-Lane execution | `POST /api/workflow/execute` | `lane: "governed_lane"`, `critic_verdict` |
+| **11. Model Config Inspection** | Governance models lookup | `GET /api/governance/models` | Active role bindings & pricing table |
 
 ---
 
@@ -34,6 +36,8 @@ TESTING=1 PYTHONPATH=backend ./venv/bin/pytest tests/ -v
 - `test_supervisor.py`: 30-prompt supervisor risk routing benchmark suite (100% accuracy target).
 - `test_fast_lane.py`: End-to-end Fast-Lane state machine execution and policy evaluation.
 - `test_governed_lane.py`: End-to-end Governed-Lane (Planner $\rightarrow$ Executor $\rightarrow$ Critic) state machine execution, Tier 1 action approval flags, dynamic model pricing lookup, and critic iteration cap.
+- `test_governance_layer.py`: Phase 4 Human approval gate interrupts, thread resumption API, dynamic policy editing, and TTL abandonment sweep.
+- `test_cost_optimization.py`: Phase 5 Prompt caching discounts, ToolResultCache TTL caching, ContextCompressor history trimming, BatchProcessor concurrency pool, and `/api/governance/metrics`.
 
 ---
 
@@ -483,11 +487,49 @@ curl -X POST "http://localhost:8000/api/governance/sweep?max_idle_hours=24.0"
 
 ---
 
-## 🔍 Section 6: Regression Pre-Release Checklist
+## 📈 Section 6: Phase 5 Governance Telemetry API (`GET /api/governance/metrics`)
+
+### Scenario 6.1: Governance Metrics & Cache Savings Lookup 📊
+
+**Goal:** Retrieve aggregated telemetry metrics across PostgreSQL audit logs, including total audit events, lane distribution (`fast_lane` vs `governed_lane`), cumulative cost USD, total cache read tokens, estimated dollar savings from prompt caching, and critic verdict breakdowns.
+
+**Swagger UI Endpoint:** `GET /api/governance/metrics`
+
+**Swagger UI Payload (Copy & Paste):**
+*(None — GET request with no request body)*
+
+**cURL Command:**
+```bash
+curl -X GET "http://localhost:8000/api/governance/metrics" \
+     -H "accept: application/json"
+```
+
+**Expected Response JSON:**
+```json
+{
+  "total_audit_events": 14,
+  "lane_distribution": {
+    "fast_lane": 4,
+    "governed_lane": 6
+  },
+  "cumulative_cost_usd": 0.005145,
+  "total_cache_read_tokens": 15000,
+  "estimated_cache_savings_usd": 0.0405,
+  "critic_verdicts": {
+    "PASS": 4,
+    "MINOR_REVISION": 1
+  }
+}
+```
+
+---
+
+## 🔍 Section 7: Regression Pre-Release Checklist
 
 Before committing new agent nodes or routing rules, verify:
-1. `TESTING=1 PYTHONPATH=backend pytest tests/` passes 100% of tests (19/19).
-2. Every node logs `AuditLogger.log_event` with session ID, cost, and payload.
-3. Model calls pass through `ModelProviderAdapter` without hardcoded vendor classes.
-4. Dynamic model pricing lookup uses `ModelProviderAdapter.get_model_name(role)` instead of hardcoded model pricing strings.
-5. Approval gates invoke `interrupt()` at node start before side-effects and handle `Command(resume=...)`.
+1. `TESTING=1 PYTHONPATH=backend pytest tests/` passes 100% of tests (23/23).
+2. `./scripts/precommit.sh` executes all 4 validation steps with 100% success.
+3. Every node logs `AuditLogger.log_event` with session ID, cost, and payload.
+4. Model calls pass through `ModelProviderAdapter` without hardcoded vendor classes.
+5. Dynamic model pricing lookup uses `ModelProviderAdapter.get_model_name(role)` instead of hardcoded model pricing strings.
+6. Approval gates invoke `interrupt()` at node start before side-effects and handle `Command(resume=...)`.

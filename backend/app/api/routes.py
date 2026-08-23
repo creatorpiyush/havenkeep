@@ -67,7 +67,6 @@ async def classify_task(
     db: AsyncSession = Depends(get_db)
 ):
     """
-    Phase 1 Endpoint:
     Routes a task through the Supervisor Router, evaluates policy allowlists,
     calculates token cost, and logs a durable audit entry into the database.
     """
@@ -149,7 +148,7 @@ async def execute_workflow(
     db: AsyncSession = Depends(get_db)
 ):
     """
-    Phase 2 End-to-End Workflow Execution Endpoint:
+    End-to-End Workflow Execution Endpoint:
     Executes a task prompt through the full LangGraph state machine:
     Supervisor -> Lane Router -> Worker / Governed Stub -> Guardrail -> Result.
     """
@@ -202,7 +201,7 @@ async def execute_workflow(
 @router.post("/workflow/resume", response_model=TaskExecuteResponse)
 async def resume_workflow(request: TaskResumeRequest):
     """
-    Phase 4 Resumption Endpoint:
+    Human Approval Resumption Endpoint:
     Resumes an interrupted LangGraph task thread using Command(resume=...).
     Accepts human decision: APPROVED, REJECTED, or EDITED.
     """
@@ -277,6 +276,50 @@ async def sweep_abandoned_threads(max_idle_hours: float = 24.0):
         "status": "completed",
         "max_idle_hours": max_idle_hours,
         "abandoned_threads_count": 0
+    }
+
+@router.get("/governance/metrics")
+async def get_governance_metrics(db: AsyncSession = Depends(get_db)):
+    """
+    Governance Metrics Telemetry Endpoint:
+    Returns aggregated governance metrics (total executions, lane distribution,
+    cumulative cost, cache savings, and critic verdicts).
+    """
+    from sqlalchemy import select, func
+    from app.db.models import AuditLog
+
+    total_logs_res = await db.execute(select(func.count(AuditLog.id)))
+    total_events = total_logs_res.scalar() or 0
+
+    fast_lane_res = await db.execute(select(func.count(AuditLog.id)).where(AuditLog.lane == "fast_lane"))
+    fast_lane_count = fast_lane_res.scalar() or 0
+
+    governed_lane_res = await db.execute(select(func.count(AuditLog.id)).where(AuditLog.lane == "governed_lane"))
+    governed_lane_count = governed_lane_res.scalar() or 0
+
+    cost_res = await db.execute(select(func.sum(AuditLog.cost_usd)))
+    total_cost_usd = round(cost_res.scalar() or 0.0, 6)
+
+    cache_read_res = await db.execute(select(func.sum(AuditLog.cache_read_tokens)))
+    total_cache_read_tokens = cache_read_res.scalar() or 0
+
+    critic_res = await db.execute(
+        select(AuditLog.critic_verdict, func.count(AuditLog.id))
+        .where(AuditLog.critic_verdict.is_not(None))
+        .group_by(AuditLog.critic_verdict)
+    )
+    critic_verdicts = {row[0]: row[1] for row in critic_res.all()}
+
+    return {
+        "total_audit_events": total_events,
+        "lane_distribution": {
+            "fast_lane": fast_lane_count,
+            "governed_lane": governed_lane_count
+        },
+        "cumulative_cost_usd": total_cost_usd,
+        "total_cache_read_tokens": total_cache_read_tokens,
+        "estimated_cache_savings_usd": round(total_cache_read_tokens * 0.0000027, 6),
+        "critic_verdicts": critic_verdicts
     }
 
 
